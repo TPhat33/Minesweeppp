@@ -1,0 +1,33 @@
+name: Build debug APK
+
+# Produces a directly-installable (unsigned) debug APK, so anyone can grab it
+# from the run's Artifacts and sideload it on an Android phone without
+# needing a keystore or a Play Store listing. GitHub's ubuntu-latest runners
+# ship the Android SDK already, which is what makes this work in CI when it
+# doesn't in a sandbox with no route to dl.google.com.
+on:
+  push:
+    branches: [claude/minesweeper-flutter-flame-ne3n6l]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter build apk --debug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: minesweeppp-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
