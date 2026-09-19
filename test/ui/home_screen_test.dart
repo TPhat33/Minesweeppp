@@ -7,6 +7,22 @@ import 'package:minesweeppp/ui/screens/home_screen.dart';
 import 'package:minesweeppp/ui/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../engine/test_boards.dart';
+
+/// Small enough that a saved run built from it stands in for a real one
+/// without paying for a real Master-sized board generation.
+const _field = <String>[
+  '.*.......',
+  '..*......',
+  '.*.......',
+  '.........',
+  '.........',
+  '....*....',
+  '.........',
+  '.........',
+  '.........',
+];
+
 Future<PlayerStore> _store([Map<String, Object> values = const {}]) async {
   SharedPreferences.setMockInitialValues(values);
   return PlayerStore.open();
@@ -135,4 +151,90 @@ void main() {
       expect(find.byType(GameScreen), findsOneWidget);
     },
   );
+
+  group('a saved run', () {
+    // Regression coverage: a leftover saved run used to sync straight into
+    // _difficulty/_mode on load, so a Master save from days ago made an
+    // unrelated tap on START RUN silently hand back a Master board — with no
+    // warning that doing so also threw the saved run away. Fixed by leaving
+    // the tiles alone and gating any new run behind a confirm dialog.
+    Future<PlayerStore> storeWithSavedRun() async {
+      final store = await _store();
+      final saved = engineFrom(
+        _field,
+        startX: 0,
+        startY: 0,
+        difficulty: Difficulty.master,
+        mode: GameMode.timed,
+      );
+      await store.saveRun(saved);
+      return store;
+    }
+
+    testWidgets('shows the save on its own Resume card', (tester) async {
+      await _pumpHome(tester, await storeWithSavedRun());
+      expect(find.text('Run in progress'), findsOneWidget);
+      expect(find.textContaining('Master · Timed'), findsOneWidget);
+      // Beginner is still the default preset, untouched by the save — the
+      // decisive check that START RUN itself builds Beginner, not Master, is
+      // below ("confirming START RUN builds a Beginner run, not Master").
+      expect(find.text(Difficulty.beginner.label), findsOneWidget);
+    });
+
+    testWidgets('START RUN asks before discarding it, and honours cancel', (
+      tester,
+    ) async {
+      final store = await storeWithSavedRun();
+      await _pumpHome(tester, store);
+
+      await tester.tap(find.text('START RUN'));
+      await tester.pump();
+
+      expect(find.text('Start a new run?'), findsOneWidget);
+      expect(find.textContaining('Master · Timed'), findsWidgets);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+
+      expect(find.byType(GameScreen), findsNothing);
+      expect(find.text('Run in progress'), findsOneWidget);
+      expect(store.loadSavedRun(), isNotNull);
+    });
+
+    testWidgets('confirming START RUN builds a Beginner run, not Master', (
+      tester,
+    ) async {
+      await _pumpHome(tester, await storeWithSavedRun());
+
+      await tester.tap(find.text('START RUN'));
+      await tester.pump();
+      await tester.tap(find.text('Start new'));
+      await tester.pump();
+      await waitForRealAsyncWork(tester);
+      await settleFrames(tester);
+
+      final gameScreen = tester.widget<GameScreen>(find.byType(GameScreen));
+      expect(gameScreen.engine.difficulty, Difficulty.beginner);
+      expect(gameScreen.engine.mode, GameMode.classic);
+    });
+
+    testWidgets('a level code also asks before discarding a saved run', (
+      tester,
+    ) async {
+      await _pumpHome(tester, await storeWithSavedRun());
+
+      await tester.tap(find.text('Level code'));
+      await tester.pumpAndSettle();
+      final code = engineFrom(
+        _field,
+        startX: 0,
+        startY: 0,
+      ).levelCode.encode();
+      await tester.enterText(find.byType(TextField), code);
+      await tester.tap(find.text('Play it'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Start a new run?'), findsOneWidget);
+    });
+  });
 }

@@ -49,17 +49,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _reloadSavedRun() {
     final saved = widget.store.loadSavedRun();
-    setState(() {
-      _savedRun = saved;
-      if (saved != null) {
-        _difficulty = saved.difficulty;
-        _mode = saved.mode;
-      }
-    });
+    // Deliberately not syncing _difficulty/_mode to the save here. It used
+    // to, so a leftover save silently changed what tile was highlighted and
+    // therefore what a later tap on START RUN would build — a save from
+    // testing Master days ago could make "Start Run" hand you a Master board
+    // with no obvious reason why, since the Resume card showing "Master ·
+    // Classic" easily goes unnoticed above the fold. The tiles now always
+    // reflect the player's own choice for a *new* run; the Resume card is
+    // the only place a save's own difficulty is shown.
+    setState(() => _savedRun = saved);
   }
 
   Future<void> _play({int? seed}) async {
     if (_busy) return;
+    if (_savedRun != null && !await _confirmDiscardSavedRun()) return;
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
       final engine = await _generate(
@@ -72,6 +76,37 @@ class _HomeScreenState extends State<HomeScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// Starting a fresh run overwrites the one saved run slot, so if there is
+  /// a run in progress this is the only thing standing between a stray tap
+  /// and losing it silently.
+  Future<bool> _confirmDiscardSavedRun() async {
+    final saved = _savedRun;
+    if (saved == null) return true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Palette.surface,
+        title: const Text('Start a new run?'),
+        content: Text(
+          'You have a run in progress — ${saved.difficulty.label} · '
+          '${saved.mode.label}, ${formatScore(saved.score)} pts. Starting a '
+          'new run will discard it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Start new'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 
   Future<void> _resume() async {
@@ -142,40 +177,52 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _enterLevelCode() async {
     if (_busy) return;
     final controller = TextEditingController();
-    final code = await showDialog<LevelCode>(
-      context: context,
-      builder: (context) => _LevelCodeDialog(controller: controller),
-    );
-    controller.dispose();
-    if (code == null || !mounted) return;
-
-    if (!code.isCurrentRules) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'That code was made with different rules, so scores would not be '
-            'comparable.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _difficulty = code.difficulty;
-      _mode = code.mode;
-    });
-    setState(() => _busy = true);
     try {
-      final engine = await _generate(
-        difficulty: code.difficulty,
-        mode: code.mode,
-        seed: code.seed,
+      final code = await showDialog<LevelCode>(
+        context: context,
+        builder: (context) => _LevelCodeDialog(controller: controller),
       );
-      if (engine == null) return;
-      await _runGame(engine);
+      if (code == null || !mounted) return;
+
+      if (!code.isCurrentRules) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'That code was made with different rules, so scores would not '
+              'be comparable.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      if (_savedRun != null && !await _confirmDiscardSavedRun()) return;
+      if (!mounted) return;
+
+      setState(() {
+        _difficulty = code.difficulty;
+        _mode = code.mode;
+      });
+      setState(() => _busy = true);
+      try {
+        final engine = await _generate(
+          difficulty: code.difficulty,
+          mode: code.mode,
+          seed: code.seed,
+        );
+        if (engine == null) return;
+        await _runGame(engine);
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      // Disposed only once every dialog this method could still show (the
+      // confirm-discard prompt included) is done with, rather than right
+      // after the level-code dialog's own Future resolves: popping that
+      // dialog and immediately opening another used to race its exit
+      // transition, which could still be rebuilding this TextField against
+      // an already-disposed controller.
+      controller.dispose();
     }
   }
 
@@ -376,9 +423,13 @@ class _ResumeCard extends StatelessWidget {
               const Icon(Icons.play_circle_fill_rounded,
                   color: Palette.accent, size: 22),
               const SizedBox(width: 8),
-              Text(
-                'Run in progress',
-                style: AppTheme.readout.copyWith(fontSize: 15),
+              Flexible(
+                child: Text(
+                  'Run in progress',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.readout.copyWith(fontSize: 15),
+                ),
               ),
               const Spacer(),
               Text(
