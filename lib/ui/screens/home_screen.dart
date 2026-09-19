@@ -177,44 +177,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _enterLevelCode() async {
     if (_busy) return;
     final controller = TextEditingController();
+    final rivalController = TextEditingController();
     try {
-      final code = await showDialog<LevelCode>(
+      final result = await showDialog<(LevelCode, int?)>(
         context: context,
-        builder: (context) => _LevelCodeDialog(controller: controller),
+        builder: (context) => _LevelCodeDialog(
+          controller: controller,
+          rivalController: rivalController,
+        ),
       );
-      if (code == null || !mounted) return;
-
-      if (!code.isCurrentRules) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'That code was made with different rules, so scores would not '
-              'be comparable.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      if (_savedRun != null && !await _confirmDiscardSavedRun()) return;
-      if (!mounted) return;
-
-      setState(() {
-        _difficulty = code.difficulty;
-        _mode = code.mode;
-      });
-      setState(() => _busy = true);
-      try {
-        final engine = await _generate(
-          difficulty: code.difficulty,
-          mode: code.mode,
-          seed: code.seed,
-        );
-        if (engine == null) return;
-        await _runGame(engine);
-      } finally {
-        if (mounted) setState(() => _busy = false);
-      }
+      if (result == null || !mounted) return;
+      final (code, rivalScore) = result;
+      await _startLevelCode(code, rivalScore: rivalScore);
     } finally {
       // Disposed only once every dialog this method could still show (the
       // confirm-discard prompt included) is done with, rather than right
@@ -223,6 +197,51 @@ class _HomeScreenState extends State<HomeScreen> {
       // transition, which could still be rebuilding this TextField against
       // an already-disposed controller.
       controller.dispose();
+      rivalController.dispose();
+    }
+  }
+
+  /// The one path from "here is a level code" to a running game — used by the
+  /// level-code dialog above and by a "Play it" tap on a board record in
+  /// Records, so a board picked from either place goes through the exact same
+  /// discard-confirm and generate-and-push sequence rather than a second copy
+  /// of it.
+  Future<void> _startLevelCode(LevelCode code, {int? rivalScore}) async {
+    if (_busy) return;
+    if (!code.isCurrentRules) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'That code was made with different rules, so scores would not '
+            'be comparable.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (_savedRun != null && !await _confirmDiscardSavedRun()) return;
+    if (!mounted) return;
+
+    if (rivalScore != null) {
+      await widget.store.setRivalScore(code, rivalScore);
+    }
+
+    setState(() {
+      _difficulty = code.difficulty;
+      _mode = code.mode;
+    });
+    setState(() => _busy = true);
+    try {
+      final engine = await _generate(
+        difficulty: code.difficulty,
+        mode: code.mode,
+        seed: code.seed,
+      );
+      if (engine == null) return;
+      await _runGame(engine);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -309,11 +328,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (context) => StatsScreen(store: widget.store),
-                      ),
-                    ),
+                    onPressed: () async {
+                      final code = await Navigator.of(context).push<LevelCode>(
+                        MaterialPageRoute<LevelCode>(
+                          builder: (context) =>
+                              StatsScreen(store: widget.store),
+                        ),
+                      );
+                      if (code != null && mounted) {
+                        await _startLevelCode(code);
+                      }
+                    },
                     icon: const Icon(Icons.leaderboard_rounded, size: 18),
                     label: const Text('Records'),
                   ),
@@ -597,9 +622,16 @@ class _ModeCard extends StatelessWidget {
 }
 
 class _LevelCodeDialog extends StatelessWidget {
-  const _LevelCodeDialog({required this.controller});
+  const _LevelCodeDialog({
+    required this.controller,
+    required this.rivalController,
+  });
 
   final TextEditingController controller;
+
+  /// Optional — a friend's score for the same board, so the HUD and result
+  /// sheet have something to chase besides the player's own best.
+  final TextEditingController rivalController;
 
   @override
   Widget build(BuildContext context) {
@@ -626,6 +658,15 @@ class _LevelCodeDialog extends StatelessWidget {
             ),
             style: AppTheme.readout.copyWith(fontSize: 16),
           ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: rivalController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              hintText: 'Their score (optional)',
+              border: OutlineInputBorder(),
+            ),
+          ),
         ],
       ),
       actions: [
@@ -642,7 +683,11 @@ class _LevelCodeDialog extends StatelessWidget {
               );
               return;
             }
-            Navigator.of(context).pop(code);
+            final rivalText = rivalController.text.trim();
+            final rivalScore = rivalText.isEmpty
+                ? null
+                : int.tryParse(rivalText);
+            Navigator.of(context).pop((code, rivalScore));
           },
           child: const Text('Play it'),
         ),

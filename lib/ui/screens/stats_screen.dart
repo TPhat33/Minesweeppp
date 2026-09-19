@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../core/engine/game_rules.dart';
+import '../../core/engine/level_code.dart';
+import '../../core/models/board_record.dart';
 import '../../core/models/run_stats.dart';
 import '../../core/storage/player_store.dart';
 import '../theme/app_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/readouts.dart';
 
-/// Personal records, one card per difficulty, split by mode.
+/// Personal records, one card per difficulty, split by mode, plus every
+/// individual board the player has kept a log of. Tapping "Play it" on a
+/// board pops this screen with that board's [LevelCode] — the caller (home
+/// screen) is the one that actually starts the run, through the same path a
+/// pasted level code takes.
 class StatsScreen extends StatelessWidget {
   const StatsScreen({super.key, required this.store});
 
@@ -20,10 +26,15 @@ class StatsScreen extends StatelessWidget {
         (mode) => store.statsFor(difficulty, mode).played > 0,
       ),
     );
+    final boards = store.loadBoards().values.toList()
+      ..sort((a, b) {
+        if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+        return b.updatedAtMs.compareTo(a.updatedAtMs);
+      });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Records')),
-      body: anyPlayed
+      body: anyPlayed || boards.isNotEmpty
           ? ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
               children: [
@@ -31,9 +42,80 @@ class StatsScreen extends StatelessWidget {
                   _DifficultyCard(difficulty: difficulty, store: store),
                   const SizedBox(height: 12),
                 ],
+                if (boards.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const SectionLabel('Boards'),
+                  const SizedBox(height: 8),
+                  for (final record in boards) ...[
+                    _BoardRow(record: record),
+                    const SizedBox(height: 8),
+                  ],
+                ],
               ],
             )
           : const _EmptyState(),
+    );
+  }
+}
+
+class _BoardRow extends StatelessWidget {
+  const _BoardRow({required this.record});
+
+  final BoardRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Palette.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Palette.outline),
+      ),
+      child: Row(
+        children: [
+          if (record.pinned) ...[
+            const Icon(
+              Icons.push_pin_rounded,
+              size: 15,
+              color: Palette.energy,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  record.code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.readout.copyWith(fontSize: 13),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${record.difficulty.label} · ${record.mode.label} · '
+                  'best ${formatScore(record.bestScore)}'
+                  '${record.rivalScore != null ? ' · rival ${formatScore(record.rivalScore!)}' : ''}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Palette.textSecondary,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: () =>
+                Navigator.of(context).pop<LevelCode>(record.toLevelCode()),
+            child: const Text('Play it'),
+          ),
+        ],
+      ),
     );
   }
 }

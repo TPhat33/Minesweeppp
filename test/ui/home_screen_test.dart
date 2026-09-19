@@ -82,7 +82,7 @@ void main() {
     await tester.tap(find.text('Level code'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'not-a-code');
+    await tester.enterText(find.byType(TextField).first, 'not-a-code');
     await tester.tap(find.text('Play it'));
     await tester.pumpAndSettle();
 
@@ -124,6 +124,30 @@ void main() {
     await settleFrames(tester);
     expect(find.byType(GameScreen), findsOneWidget);
   });
+
+  testWidgets(
+    'a rival score entered with a level code is saved against that board',
+    (tester) async {
+      final store = await _store();
+      await _pumpHome(tester, store);
+
+      final target = engineFrom(_field, startX: 0, startY: 0);
+      await tester.tap(find.text('Level code'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField).first,
+        target.levelCode.encode(),
+      );
+      await tester.enterText(find.byType(TextField).last, '777');
+      await tester.tap(find.text('Play it'));
+      await tester.pump();
+      await waitForRealAsyncWork(tester);
+      await settleFrames(tester);
+
+      expect(find.byType(GameScreen), findsOneWidget);
+      expect(store.boardFor(target.levelCode)?.rivalScore, 777);
+    },
+  );
 
   testWidgets(
     'tapping START RUN twice before it navigates never opens two game '
@@ -230,7 +254,7 @@ void main() {
         startX: 0,
         startY: 0,
       ).levelCode.encode();
-      await tester.enterText(find.byType(TextField), code);
+      await tester.enterText(find.byType(TextField).first, code);
       await tester.tap(find.text('Play it'));
       await tester.pumpAndSettle();
 

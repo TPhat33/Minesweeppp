@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/engine/game_rules.dart';
 import '../../core/engine/minesweeper_engine.dart';
+import '../../core/models/board_record.dart';
 import '../../core/models/game_settings.dart';
 import '../../core/storage/player_store.dart';
 import '../../game/game_session.dart';
@@ -39,6 +40,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _resultShown = false;
   bool _pauseMenuOpen = false;
 
+  /// What the player (or a friend) has done on this exact board before, if
+  /// anything — loaded once, since it does not change during the run itself
+  /// (this run's own result only ever gets folded in once it ends).
+  BoardRecord? _target;
+
   @override
   void initState() {
     super.initState();
@@ -49,6 +55,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       store: widget.store,
     )..addListener(_onSessionChanged);
     _game = MinesweeperGame(session: _session);
+    _target = widget.store.boardFor(widget.engine.levelCode);
   }
 
   @override
@@ -93,7 +100,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       backgroundColor: Colors.transparent,
       isDismissible: false,
       enableDrag: false,
-      builder: (context) => ResultSheet(engine: _session.engine),
+      builder: (context) => ResultSheet(
+        engine: _session.engine,
+        store: widget.store,
+        target: _target,
+      ),
     );
     if (!mounted) return;
 
@@ -196,7 +207,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                       builder: (context, _) => Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          HudBar(engine: engine, onPause: _openPauseMenu),
+                          HudBar(
+                            engine: engine,
+                            target: _target,
+                            onPause: _openPauseMenu,
+                          ),
                           if (engine.mode == GameMode.timed) ...[
                             const SizedBox(height: 8),
                             EnergyMeter(

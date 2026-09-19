@@ -204,6 +204,7 @@ class GameSession extends ChangeNotifier {
     if (_recorded) return;
     _recorded = true;
     await store.recordRun(engine);
+    await store.recordBoard(engine);
     await store.clearSavedRun();
   }
 

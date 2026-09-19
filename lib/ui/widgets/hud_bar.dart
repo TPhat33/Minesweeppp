@@ -2,19 +2,47 @@ import 'package:flutter/material.dart';
 
 import '../../core/engine/game_rules.dart';
 import '../../core/engine/minesweeper_engine.dart';
+import '../../core/models/board_record.dart';
 import '../theme/palette.dart';
 import 'readouts.dart';
 
 /// Top-of-screen readouts: what is left, how long it has taken, what it is
 /// worth.
 class HudBar extends StatelessWidget {
-  const HudBar({super.key, required this.engine, required this.onPause});
+  const HudBar({
+    super.key,
+    required this.engine,
+    required this.onPause,
+    this.target,
+  });
 
   final MinesweeperEngine engine;
   final VoidCallback onPause;
 
+  /// This board's record, if it has one — the source of the score being
+  /// chased. Null for a board played for the first time.
+  final BoardRecord? target;
+
   @override
   Widget build(BuildContext context) {
+    final targetScore = target?.target;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _mainRow(context),
+        if (targetScore != null) ...[
+          const SizedBox(height: 8),
+          _TargetChip(
+            targetScore: targetScore,
+            currentScore: engine.score,
+            chasingRival: target!.targetIsRival,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _mainRow(BuildContext context) {
     final timed = engine.mode == GameMode.timed;
     final seconds = timed ? engine.secondsRemaining : engine.elapsedSeconds;
     final urgent = timed && engine.secondsRemaining <= 20;
@@ -54,6 +82,34 @@ class HudBar extends StatelessWidget {
           color: Palette.accent,
         ),
       ],
+    );
+  }
+}
+
+/// What's being chased on this board: the player's own best, or — if it's
+/// higher — a rival's reported score. Green and "+ahead" once passed, the
+/// board's own accent color and "to go" before that.
+class _TargetChip extends StatelessWidget {
+  const _TargetChip({
+    required this.targetScore,
+    required this.currentScore,
+    required this.chasingRival,
+  });
+
+  final int targetScore;
+  final int currentScore;
+  final bool chasingRival;
+
+  @override
+  Widget build(BuildContext context) {
+    final ahead = currentScore - targetScore;
+    final leading = ahead >= 0;
+    return StatChip(
+      icon: chasingRival ? Icons.person_rounded : Icons.emoji_events_rounded,
+      value: leading ? '+${formatScore(ahead)}' : formatScore(-ahead),
+      label: leading ? 'ahead' : 'to go',
+      color: leading ? Palette.success : Palette.textSecondary,
+      emphasis: leading,
     );
   }
 }
