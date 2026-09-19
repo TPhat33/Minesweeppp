@@ -94,6 +94,28 @@ same attention as the scoring:
   are all under a second, and every one of them can be switched off.
 - **Runs survive closing the app.** Board, marks, score and clock are saved.
 
+## Sound
+
+Every effect is synthesized, not sourced — `tool/synth_sfx.py` generates all
+14 `.wav` files in `assets/audio/sfx/` from scratch with plain oscillators and
+noise (no `numpy`, just `math` and `wave`). That sidesteps licensing entirely,
+and a set of digital bleeps and chimes suits a salvage rig better than
+realistic foley would anyway. Regenerate the bank with:
+
+```sh
+python3 tool/synth_sfx.py assets/audio/sfx
+```
+
+Reveal, flood reveal, flag, unflag, batch-select, batch-deselect, small
+salvage, big-batch salvage, bad salvage, explosion, timeout, win, the energy
+boost, and opening the pause menu each get a distinct cue — routed through
+`GameSession`, the same place haptics are chosen, so the two always agree on
+what just happened. `FlameAudio.audioCache` preloads the whole bank once at
+startup without blocking it; playback never throws even with no audio backend
+available (a headless test, an unsupported platform, no output device), which
+is what lets `flutter test` run clean in this sandbox with no audio plugin
+registered. Toggled independently of haptics and animations in Settings.
+
 ## Layout
 
 ```
@@ -102,10 +124,12 @@ lib/
   core/models/      settings and records
   core/storage/     local persistence
   game/             Flame: board rendering, camera, effects, session glue
+  game/audio/       sound effect enum + the playback wrapper
   ui/               menus, HUD, theme, pointer handling
+assets/audio/sfx/   synthesized sound effects (see tool/synth_sfx.py)
 test/engine/        rules, solver, generation, serialization
-test/ui/            gestures, HUD, results
-tool/               bench_generator.dart
+test/ui/            gestures, HUD, results, sound routing
+tool/               bench_generator.dart, synth_sfx.py
 ```
 
 The engine has no dependency on Flutter or Flame. That is what lets the solver
@@ -116,13 +140,20 @@ replay boards, and the tests drive the rules directly.
 ```sh
 flutter pub get
 flutter run                  # a connected device or emulator
-flutter test                 # 109 tests
+flutter test                 # 116 tests
 flutter analyze
 ```
 
 Requires Flutter 3.47 or newer (developed against 3.47.5 / Dart 3.13.4).
 Building for iOS needs macOS and Xcode; see the
 [Flutter iOS deployment docs](https://docs.flutter.dev/deployment/ios).
+
+> **Note on `path_provider_android`:** a recent release moved its Android
+> implementation onto JNI bindings, so building for Android now runs a native
+> build-hook step that needs the Android SDK present — even for
+> `flutter build bundle`, not just `apk`/`appbundle`. Nothing to do about it
+> from this repo; a normal Android SDK install (Android Studio, or
+> `sdkmanager`) satisfies it.
 
 ## Not in this version
 
@@ -131,4 +162,3 @@ Deliberately left for later, so the first build stays small enough to balance:
 - side missions (open a path, clear marked cells, batch-of-four targets)
 - daily challenge and leaderboards
 - online play
-- sound (haptics are implemented; audio has no assets yet)

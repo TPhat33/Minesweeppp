@@ -8,6 +8,7 @@ import '../core/engine/minesweeper_engine.dart';
 import '../core/engine/move_result.dart';
 import '../core/models/game_settings.dart';
 import '../core/storage/player_store.dart';
+import 'audio/sound_manager.dart';
 
 /// Owns one run: it turns taps into engine calls, keeps the clock going,
 /// autosaves, and hands every [MoveResult] to the renderer so it can play the
@@ -34,6 +35,7 @@ class GameSession extends ChangeNotifier {
   bool _disposed = false;
   bool _notifyPending = false;
   double _sinceSave = 0;
+  final SoundManager _sound = SoundManager();
 
   /// Effects sink. The Flame layer sets this; nothing else listens.
   void Function(MoveResult result)? onMove;
@@ -66,7 +68,10 @@ class GameSession extends ChangeNotifier {
   void setPaused(bool value) {
     if (_paused == value) return;
     _paused = value;
-    if (value) unawaited(save());
+    if (value) {
+      unawaited(save());
+      _chime(SoundEffect.pause);
+    }
     _notify();
   }
 
@@ -139,6 +144,7 @@ class GameSession extends ChangeNotifier {
     if (!engine.canSpendEnergyForTime) return;
     engine.spendEnergyForTime();
     _buzz(HapticFeedback.mediumImpact);
+    _chime(SoundEffect.boost);
     _notify();
   }
 
@@ -189,6 +195,7 @@ class GameSession extends ChangeNotifier {
     _chordPreview = const [];
     onMove?.call(result);
     _feedbackFor(result);
+    _soundFor(result);
     if (engine.isOver) unawaited(_finishRun());
     _notify();
   }
@@ -229,5 +236,63 @@ class GameSession extends ChangeNotifier {
   void _buzz(Future<void> Function() feedback) {
     if (!_settings.haptics) return;
     unawaited(feedback());
+  }
+
+  /// Which cue plays for a move. The end-of-run cases are checked first and
+  /// take over the whole move, since "you won" or "you lost" matters more
+  /// than whatever action triggered it.
+  void _soundFor(MoveResult result) {
+    if (result.status == GameStatus.won) {
+      _chime(SoundEffect.win);
+      return;
+    }
+    if (result.status == GameStatus.lost) {
+      switch (engine.lossReason) {
+        case LossReason.mineRevealed:
+          _chime(SoundEffect.explode);
+        case LossReason.badSalvage:
+          _chime(SoundEffect.salvageFail);
+        case LossReason.timeout:
+          _chime(SoundEffect.timeout);
+        case null:
+          break;
+      }
+      return;
+    }
+
+    switch (result.kind) {
+      case MoveKind.reveal:
+      case MoveKind.chord:
+        if (result.revealed.length > 8) {
+          _chime(SoundEffect.revealWave);
+        } else if (result.revealed.isNotEmpty) {
+          _chime(SoundEffect.reveal);
+        }
+      case MoveKind.flag:
+        _chime(SoundEffect.flag);
+      case MoveKind.unflag:
+        _chime(SoundEffect.unflag);
+      case MoveKind.select:
+        if (result.selected.isNotEmpty) {
+          _chime(SoundEffect.select);
+        } else if (result.deselected.isNotEmpty) {
+          _chime(SoundEffect.deselect);
+        }
+      case MoveKind.salvage:
+        _chime(
+          result.batchSize >= 3
+              ? SoundEffect.salvageBatch
+              : SoundEffect.salvageSmall,
+        );
+      case MoveKind.explode:
+        _chime(SoundEffect.explode);
+      case MoveKind.none:
+        break;
+    }
+  }
+
+  void _chime(SoundEffect effect, {double volume = 1.0}) {
+    if (!_settings.sfx) return;
+    _sound.play(effect, volume: volume);
   }
 }

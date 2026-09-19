@@ -22,6 +22,8 @@ class MoveResult {
     this.failedSalvage = const [],
     this.flagged = const [],
     this.unflagged = const [],
+    this.selected = const [],
+    this.deselected = const [],
     this.explodedIndex,
     this.scoreDelta = 0,
     this.energyDelta = 0,
@@ -36,6 +38,8 @@ class MoveResult {
       failedSalvage = const [],
       flagged = const [],
       unflagged = const [],
+      selected = const [],
+      deselected = const [],
       explodedIndex = null,
       scoreDelta = 0,
       energyDelta = 0,
@@ -54,6 +58,15 @@ class MoveResult {
 
   final List<int> flagged;
   final List<int> unflagged;
+
+  /// Flags that joined the salvage batch this move (a single tap, or every
+  /// flag from "select all"). Lets the renderer play a different cue for
+  /// adding to the batch than for taking something out of it.
+  final List<int> selected;
+
+  /// Flags that left the salvage batch this move.
+  final List<int> deselected;
+
   final int? explodedIndex;
   final int scoreDelta;
   final int energyDelta;

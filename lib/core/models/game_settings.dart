@@ -7,6 +7,7 @@ class GameSettings {
     this.defaultInputMode = InputMode.reveal,
     this.haptics = true,
     this.animations = true,
+    this.sfx = true,
     this.longPressToFlag = true,
     this.confirmSalvage = true,
   });
@@ -20,6 +21,9 @@ class GameSettings {
   /// running the phone in a reduced-motion setup.
   final bool animations;
 
+  /// Sound effects for reveals, flags, salvage and the end of a run.
+  final bool sfx;
+
   /// Long-press does the other action, so both are reachable without visiting
   /// the toggle.
   final bool longPressToFlag;
@@ -31,6 +35,7 @@ class GameSettings {
     InputMode? defaultInputMode,
     bool? haptics,
     bool? animations,
+    bool? sfx,
     bool? longPressToFlag,
     bool? confirmSalvage,
   }) {
@@ -38,6 +43,7 @@ class GameSettings {
       defaultInputMode: defaultInputMode ?? this.defaultInputMode,
       haptics: haptics ?? this.haptics,
       animations: animations ?? this.animations,
+      sfx: sfx ?? this.sfx,
       longPressToFlag: longPressToFlag ?? this.longPressToFlag,
       confirmSalvage: confirmSalvage ?? this.confirmSalvage,
     );
@@ -47,6 +53,7 @@ class GameSettings {
     'defaultInputMode': defaultInputMode.name,
     'haptics': haptics,
     'animations': animations,
+    'sfx': sfx,
     'longPressToFlag': longPressToFlag,
     'confirmSalvage': confirmSalvage,
   };
@@ -58,6 +65,7 @@ class GameSettings {
           InputMode.reveal,
       haptics: json['haptics'] as bool? ?? true,
       animations: json['animations'] as bool? ?? true,
+      sfx: json['sfx'] as bool? ?? true,
       longPressToFlag: json['longPressToFlag'] as bool? ?? true,
       confirmSalvage: json['confirmSalvage'] as bool? ?? true,
     );

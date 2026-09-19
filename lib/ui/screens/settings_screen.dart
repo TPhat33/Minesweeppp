@@ -118,6 +118,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: TextStyle(fontSize: 12),
                   ),
                 ),
+                const Divider(),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _settings.sfx,
+                  onChanged: (value) => _update(_settings.copyWith(sfx: value)),
+                  title: const Text('Sound effects'),
+                  subtitle: const Text(
+                    'A different cue for opening, flagging, salvaging, a '
+                    'wrong call and the end of a run.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ),
               ],
             ),
           ),

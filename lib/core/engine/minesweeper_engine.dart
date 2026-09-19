@@ -169,23 +169,36 @@ class MinesweeperEngine {
   MoveResult toggleSalvageSelection(int index) {
     if (_status != GameStatus.playing) return MoveResult.none(_status);
     if (_state[index] != CellState.flagged) return MoveResult.none(_status);
-    if (!_selection.remove(index)) _selection.add(index);
-    return MoveResult(kind: MoveKind.select, status: _status);
+    final wasSelected = _selection.remove(index);
+    final added = !wasSelected;
+    if (added) _selection.add(index);
+    return MoveResult(
+      kind: MoveKind.select,
+      status: _status,
+      selected: added ? [index] : const [],
+      deselected: added ? const [] : [index],
+    );
   }
 
   /// Puts every flag into the batch — the "I am sure about all of these" move.
   MoveResult selectAllFlags() {
     if (_status != GameStatus.playing) return MoveResult.none(_status);
+    final added = <int>[];
     for (var i = 0; i < _state.length; i++) {
-      if (_state[i] == CellState.flagged) _selection.add(i);
+      if (_state[i] == CellState.flagged && _selection.add(i)) added.add(i);
     }
-    return MoveResult(kind: MoveKind.select, status: _status);
+    return MoveResult(kind: MoveKind.select, status: _status, selected: added);
   }
 
   MoveResult clearSelection() {
     if (_selection.isEmpty) return MoveResult.none(_status);
+    final removed = _selection.toList();
     _selection.clear();
-    return MoveResult(kind: MoveKind.select, status: _status);
+    return MoveResult(
+      kind: MoveKind.select,
+      status: _status,
+      deselected: removed,
+    );
   }
 
   /// Cashes in the current batch.

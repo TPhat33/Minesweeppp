@@ -202,6 +202,38 @@ void main() {
       expect(engine.selectionSize, 0);
     });
 
+    test('the result says whether a cell joined or left the batch', () {
+      final engine = engineFrom(_field, startX: 0, startY: 0);
+      engine.toggleFlag(_mineA);
+
+      final added = engine.toggleSalvageSelection(_mineA);
+      expect(added.selected, [_mineA]);
+      expect(added.deselected, isEmpty);
+
+      final removed = engine.toggleSalvageSelection(_mineA);
+      expect(removed.selected, isEmpty);
+      expect(removed.deselected, [_mineA]);
+    });
+
+    test('selectAllFlags reports only the flags newly added', () {
+      final engine = engineFrom(_field, startX: 0, startY: 0);
+      engine.toggleFlag(_mineA);
+      engine.toggleFlag(_mineB);
+      engine.toggleSalvageSelection(_mineA); // already in the batch
+
+      final result = engine.selectAllFlags();
+      expect(result.selected, [_mineB]);
+    });
+
+    test('clearSelection reports every cell it dropped', () {
+      final engine = engineFrom(_field, startX: 0, startY: 0);
+      flagAndSelect(engine, [_mineA, _mineB]);
+
+      final result = engine.clearSelection();
+      expect(result.deselected, containsAll([_mineA, _mineB]));
+      expect(result.deselected, hasLength(2));
+    });
+
     test('selectAllFlags picks up every flag on the board', () {
       final engine = engineFrom(_field, startX: 0, startY: 0);
       engine.toggleFlag(_mineA);
