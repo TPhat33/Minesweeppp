@@ -126,6 +126,22 @@ void main() {
   });
 
   testWidgets(
+    'a fresh run from START RUN is hidden behind a tap-to-start cover',
+    (tester) async {
+      await _pumpHome(tester, await _store());
+      await tester.tap(find.text('START RUN'));
+      await tester.pump();
+      await waitForRealAsyncWork(tester);
+      await settleFrames(tester);
+
+      expect(find.byType(GameScreen), findsOneWidget);
+      final screen = tester.widget<GameScreen>(find.byType(GameScreen));
+      expect(screen.showStartCover, isTrue);
+      expect(find.text('TAP TO START'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'a rival score entered with a level code is saved against that board',
     (tester) async {
       final store = await _store();
@@ -203,6 +219,21 @@ void main() {
       // decisive check that START RUN itself builds Beginner, not Master, is
       // below ("confirming START RUN builds a Beginner run, not Master").
       expect(find.text(Difficulty.beginner.label), findsOneWidget);
+    });
+
+    testWidgets('tapping RESUME never shows the tap-to-start cover', (
+      tester,
+    ) async {
+      await _pumpHome(tester, await storeWithSavedRun());
+      await tester.tap(find.text('RESUME'));
+      await tester.pump();
+      await waitForRealAsyncWork(tester);
+      await settleFrames(tester);
+
+      expect(find.byType(GameScreen), findsOneWidget);
+      final screen = tester.widget<GameScreen>(find.byType(GameScreen));
+      expect(screen.showStartCover, isFalse);
+      expect(find.text('TAP TO START'), findsNothing);
     });
 
     testWidgets('START RUN asks before discarding it, and honours cancel', (

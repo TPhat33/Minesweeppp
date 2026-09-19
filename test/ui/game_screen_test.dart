@@ -33,8 +33,9 @@ Future<PlayerStore> _store() async {
 Future<void> _pumpGame(
   WidgetTester tester,
   MinesweeperEngine engine,
-  PlayerStore store,
-) async {
+  PlayerStore store, {
+  bool showStartCover = false,
+}) async {
   tester.view.physicalSize = const Size(440, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
@@ -47,6 +48,7 @@ Future<void> _pumpGame(
         engine: engine,
         settings: const GameSettings(),
         store: store,
+        showStartCover: showStartCover,
       ),
     ),
   );
@@ -193,6 +195,47 @@ void main() {
     }
 
     expect(find.text('Paused'), findsOneWidget);
+  });
+
+  group('start cover', () {
+    testWidgets(
+      'a fresh run is hidden behind a tap-to-start cover, and the clock '
+      'waits for it',
+      (tester) async {
+        final engine = engineFrom(
+          _field,
+          startX: 0,
+          startY: 0,
+          mode: GameMode.timed,
+        );
+        final before = engine.secondsRemaining;
+        await _pumpGame(tester, engine, await _store(), showStartCover: true);
+
+        expect(find.text('TAP TO START'), findsOneWidget);
+        // The board underneath is already opened (same as any other run —
+        // the solver's proof is anchored to construction time), but the
+        // cover hides it and the clock is held so nothing runs before the
+        // player has looked at anything.
+        await tester.pump(const Duration(seconds: 2));
+        expect(engine.secondsRemaining, before);
+
+        await tester.tap(find.text('TAP TO START'));
+        await tester.pump(const Duration(milliseconds: 16));
+
+        expect(find.text('TAP TO START'), findsNothing);
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(engine.secondsRemaining, lessThan(before));
+      },
+    );
+
+    testWidgets('a resumed run never shows the cover', (tester) async {
+      await _pumpGame(
+        tester,
+        engineFrom(_field, startX: 0, startY: 0),
+        await _store(),
+      );
+      expect(find.text('TAP TO START'), findsNothing);
+    });
   });
 
   group('camera', () {

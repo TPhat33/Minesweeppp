@@ -167,6 +167,23 @@ void main() {
       expect(session.engine.secondsRemaining, before);
       session.dispose();
     });
+
+    test('a held run does not tick, and releasing it lets the clock run', () async {
+      final session = await _session(mode: GameMode.timed);
+      expect(session.held, isFalse);
+
+      session.hold();
+      expect(session.held, isTrue);
+      final before = session.engine.secondsRemaining;
+      session.tick(5);
+      expect(session.engine.secondsRemaining, before);
+
+      session.release();
+      expect(session.held, isFalse);
+      session.tick(5);
+      expect(session.engine.secondsRemaining, lessThan(before));
+      session.dispose();
+    });
   });
 
   test('a finished run is recorded and the save is cleared', () async {

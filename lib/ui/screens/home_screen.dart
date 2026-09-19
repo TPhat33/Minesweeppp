@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
         seed: seed,
       );
       if (engine == null) return;
-      await _runGame(engine);
+      await _runGame(engine, isFreshRun: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (saved == null) return;
     setState(() => _busy = true);
     try {
-      await _runGame(saved);
+      await _runGame(saved, isFreshRun: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -123,8 +123,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Plays a run and honours whatever the results sheet asked for next, so a
   /// player can keep going without walking back through the menu.
-  Future<void> _runGame(MinesweeperEngine engine) async {
+  ///
+  /// [isFreshRun] is true for a board the player has never seen — it gets the
+  /// "tap to start" cover so a low-density board's generous opening flood
+  /// never looks like progress they did not make themselves. False only for
+  /// a resumed save, which they have already looked at; every board after
+  /// the first lap of the loop below is freshly generated, so it always gets
+  /// the cover regardless of how the run that led to it ended.
+  Future<void> _runGame(
+    MinesweeperEngine engine, {
+    required bool isFreshRun,
+  }) async {
     var current = engine;
+    var fresh = isFreshRun;
     while (true) {
       if (!mounted) return;
       final next = await Navigator.of(context).push<NextRunRequest>(
@@ -133,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
             engine: current,
             settings: _settings,
             store: widget.store,
+            showStartCover: fresh,
           ),
         ),
       );
@@ -144,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (replacement == null) break;
       current = replacement;
+      fresh = true;
     }
     if (mounted) _reloadSavedRun();
   }
@@ -239,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
         seed: code.seed,
       );
       if (engine == null) return;
-      await _runGame(engine);
+      await _runGame(engine, isFreshRun: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

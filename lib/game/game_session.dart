@@ -31,6 +31,7 @@ class GameSession extends ChangeNotifier {
   InputMode _inputMode;
   List<int> _chordPreview = const [];
   bool _paused = false;
+  bool _held = false;
   bool _recorded = false;
   bool _disposed = false;
   bool _notifyPending = false;
@@ -48,6 +49,27 @@ class GameSession extends ChangeNotifier {
 
   bool get paused => _paused;
   bool get isOver => engine.isOver;
+
+  /// True while a freshly generated run is still showing its "tap to start"
+  /// cover. The board is already opened underneath (the engine reveals the
+  /// start cell the moment it's built, so the solver's no-guess proof stays
+  /// anchored to construction time) — this just keeps the clock from running
+  /// before the player has looked at anything.
+  bool get held => _held;
+
+  /// Keeps the clock from ticking until [release] is called.
+  void hold() {
+    if (_held) return;
+    _held = true;
+    _notify();
+  }
+
+  /// Lets the clock run — called once the player dismisses the start cover.
+  void release() {
+    if (!_held) return;
+    _held = false;
+    _notify();
+  }
 
   set settings(GameSettings value) {
     _settings = value;
@@ -151,7 +173,7 @@ class GameSession extends ChangeNotifier {
   // ------------------------------------------------------------------ clock
   /// Driven by the Flame game loop.
   void tick(double dt) {
-    if (_paused || engine.isOver) return;
+    if (_paused || _held || engine.isOver) return;
     final result = engine.tick(dt);
     if (result != null) {
       _afterMove(result);

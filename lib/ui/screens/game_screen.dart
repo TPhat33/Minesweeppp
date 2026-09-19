@@ -9,6 +9,7 @@ import '../../core/models/game_settings.dart';
 import '../../core/storage/player_store.dart';
 import '../../game/game_session.dart';
 import '../../game/minesweeper_game.dart';
+import '../theme/app_theme.dart';
 import '../theme/palette.dart';
 import '../widgets/board_view.dart';
 import '../widgets/energy_meter.dart';
@@ -24,11 +25,20 @@ class GameScreen extends StatefulWidget {
     required this.engine,
     required this.settings,
     required this.store,
+    this.showStartCover = false,
   });
 
   final MinesweeperEngine engine;
   final GameSettings settings;
   final PlayerStore store;
+
+  /// True for a run the player has never seen yet — the board is already
+  /// opened underneath (the engine reveals the start cell the moment it is
+  /// built), but a full-screen "tap to start" cover hides it and holds the
+  /// clock until the player's own tap dismisses it, so nothing looks
+  /// pre-played before they have done anything. False for a resumed save,
+  /// which the player has already looked at.
+  final bool showStartCover;
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -39,6 +49,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final MinesweeperGame _game;
   bool _resultShown = false;
   bool _pauseMenuOpen = false;
+  late bool _showStartCover;
 
   /// What the player (or a friend) has done on this exact board before, if
   /// anything — loaded once, since it does not change during the run itself
@@ -56,6 +67,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     )..addListener(_onSessionChanged);
     _game = MinesweeperGame(session: _session);
     _target = widget.store.boardFor(widget.engine.levelCode);
+    _showStartCover = widget.showStartCover;
+    if (_showStartCover) _session.hold();
+  }
+
+  void _beginRun() {
+    if (!_showStartCover) return;
+    setState(() => _showStartCover = false);
+    _session.release();
   }
 
   @override
@@ -253,7 +272,79 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
+            if (_showStartCover)
+              Positioned.fill(
+                child: _StartCover(
+                  difficulty: engine.difficulty,
+                  mode: engine.mode,
+                  onStart: _beginRun,
+                ),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hides an already-opened board until the player's own tap dismisses it, so
+/// a low-density board's generous opening flood never looks like progress
+/// they did not make themselves.
+class _StartCover extends StatelessWidget {
+  const _StartCover({
+    required this.difficulty,
+    required this.mode,
+    required this.onStart,
+  });
+
+  final Difficulty difficulty;
+  final GameMode mode;
+  final VoidCallback onStart;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Palette.background,
+      child: InkWell(
+        onTap: onStart,
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.touch_app_rounded,
+                  size: 44,
+                  color: Palette.accent,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '${difficulty.label} · ${mode.label}',
+                  style: const TextStyle(
+                    color: Palette.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'TAP TO START',
+                  style: AppTheme.readout.copyWith(
+                    fontSize: 22,
+                    color: Palette.accent,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Your first tap opens the field.',
+                  style: TextStyle(
+                    color: Palette.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
