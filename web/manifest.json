@@ -1,0 +1,35 @@
+{
+    "name": "Minesweeppp",
+    "short_name": "Minesweeppp",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0B1016",
+    "theme_color": "#0B1016",
+    "description": "The mines are the prize. Mark them, batch them, bring them home.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

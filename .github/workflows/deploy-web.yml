@@ -1,0 +1,49 @@
+name: Deploy web preview
+
+# Builds the CanvasKit web renderer and publishes it to GitHub Pages, so the
+# game can be opened straight in a phone's browser — the one path that needs
+# neither a Mac (real iOS builds do) nor an Android SDK (the debug-APK
+# workflow's approach, useless on an iPhone).
+on:
+  push:
+    branches: [claude/minesweeper-flutter-flame-ne3n6l]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+
+      - run: flutter pub get
+      # Base-href matches this being served from a project Pages site
+      # (https://<user>.github.io/<repo>/), not the repo root.
+      - run: flutter build web --release --base-href /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
