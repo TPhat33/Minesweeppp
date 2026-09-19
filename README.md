@@ -116,7 +116,7 @@ replay boards, and the tests drive the rules directly.
 ```sh
 flutter pub get
 flutter run                  # a connected device or emulator
-flutter test                 # 105 tests
+flutter test                 # 109 tests
 flutter analyze
 ```
 

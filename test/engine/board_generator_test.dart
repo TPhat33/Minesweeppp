@@ -67,6 +67,28 @@ void main() {
     }
   }, timeout: const Timeout(Duration(minutes: 4)));
 
+  test('generateAsync returns the same board as the inline path', () async {
+    // Boards cross an isolate boundary on the way back to the UI, so this
+    // guards against a Board that cannot be sent.
+    final inline = generator.generate(
+      difficulty: Difficulty.beginner,
+      seed: 777,
+    );
+    final offThread = await BoardGenerator.generateAsync(
+      difficulty: Difficulty.beginner,
+      seed: 777,
+    );
+
+    expect(offThread.seed, inline.seed);
+    expect(offThread.noGuess, isTrue);
+    expect(offThread.board.startIndex, inline.board.startIndex);
+    expect(offThread.board.mineCount, Difficulty.beginner.mineCount);
+    for (var i = 0; i < inline.board.cellCount; i++) {
+      expect(offThread.board.isMine(i), inline.board.isMine(i));
+      expect(offThread.board.adjacentMines(i), inline.board.adjacentMines(i));
+    }
+  });
+
   group('deterministic random', () {
     test('produces the same stream for the same seed', () {
       final a = DeterministicRandom(12345);
