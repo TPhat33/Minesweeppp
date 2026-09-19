@@ -218,7 +218,7 @@ class GameSession extends ChangeNotifier {
       case MoveKind.salvage:
         if (result.isFatal) {
           _buzz(HapticFeedback.heavyImpact);
-        } else if (result.batchSize >= 3) {
+        } else if (result.batchSize >= 3 || result.chainLevel >= 3) {
           _buzz(HapticFeedback.heavyImpact);
         } else {
           _buzz(HapticFeedback.mediumImpact);
@@ -284,6 +284,13 @@ class GameSession extends ChangeNotifier {
               ? SoundEffect.salvageBatch
               : SoundEffect.salvageSmall,
         );
+        // A chain worth noticing gets its own layer rather than a dedicated
+        // sound file: a light boost chime under the salvage cue reads as
+        // "and then some" without adding to the synthesized bank in
+        // tool/synth_sfx.py for what is, musically, the same shape of event.
+        if (result.chainLevel >= 3) {
+          _chime(SoundEffect.boost, volume: 0.6);
+        }
       case MoveKind.explode:
         _chime(SoundEffect.explode);
       case MoveKind.none:

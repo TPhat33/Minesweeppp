@@ -39,6 +39,36 @@ void main() {
     });
   });
 
+  group('salvage chain bonus', () {
+    test('level 1 (no chain yet) pays nothing', () {
+      expect(GameRules.chainBonus(1, 5), 0);
+      expect(GameRules.chainBonus(0, 5), 0);
+    });
+
+    test('grows with both chain level and batch size', () {
+      // chainBonusPerStep * (level - 1) * count
+      expect(GameRules.chainBonus(2, 3), 25 * 1 * 3);
+      expect(GameRules.chainBonus(3, 3), 25 * 2 * 3);
+      expect(GameRules.chainBonus(2, 5), 25 * 1 * 5);
+    });
+
+    test('caps out at maxChainLevel, matching the design table', () {
+      expect(
+        GameRules.chainBonus(GameRules.maxChainLevel, 5),
+        25 * (GameRules.maxChainLevel - 1) * 5,
+      );
+      expect(GameRules.chainBonus(GameRules.maxChainLevel, 5), 500);
+    });
+
+    test('never negative for any inputs', () {
+      for (var level = -2; level <= GameRules.maxChainLevel + 2; level++) {
+        for (var count = 0; count <= 6; count++) {
+          expect(GameRules.chainBonus(level, count), greaterThanOrEqualTo(0));
+        }
+      }
+    });
+  });
+
   group('classic speed bonus', () {
     test('pays for finishing under par', () {
       final par = GameRules.parSeconds(Difficulty.beginner);

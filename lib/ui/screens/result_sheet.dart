@@ -116,6 +116,13 @@ class ResultSheet extends StatelessWidget {
                     label: 'best batch',
                     color: Palette.energy,
                   ),
+                if (engine.bestChainLevel > 1)
+                  StatChip(
+                    icon: Icons.link_rounded,
+                    value: 'x${engine.bestChainLevel}',
+                    label: 'best chain',
+                    color: Palette.energy,
+                  ),
                 if (engine.mode == GameMode.timed && engine.energy > 0)
                   StatChip(
                     icon: Icons.battery_charging_full_rounded,

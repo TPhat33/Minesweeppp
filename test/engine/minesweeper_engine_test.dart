@@ -29,6 +29,25 @@ const _mineD = 5 * 9 + 4; // (4, 5)
 
 int at(int x, int y) => y * 9 + x;
 
+/// A 9x9 field with ten scattered mines, spaced out so each can be flagged
+/// and salvaged independently in a chosen batch size — this is what makes it
+/// possible to script an exact sequence of chain-building and chain-breaking
+/// batches. Starting at (0, 0) again keeps everything but the opening cell
+/// hidden.
+const _chainField = <String>[
+  '.........',
+  '.........',
+  '..*..*...',
+  '.........',
+  '.*..*..*.',
+  '.........',
+  '*..*..*..',
+  '.........',
+  '..*....*.',
+];
+
+List<int> _mines(List<(int, int)> coords) => [for (final (x, y) in coords) at(x, y)];
+
 void main() {
   group('opening', () {
     test('the start cell is opened for the player', () {
@@ -410,6 +429,133 @@ void main() {
         engine.score - beforeWin,
         revealed * GameRules.pointsPerRevealedCell + expectedBonus,
       );
+    });
+  });
+
+  group('salvage chain', () {
+    void flagAndSelect(MinesweeperEngine engine, List<int> cells) {
+      for (final cell in cells) {
+        engine.toggleFlag(cell);
+        engine.toggleSalvageSelection(cell);
+      }
+    }
+
+    MinesweeperEngine chainEngine() =>
+        engineFrom(_chainField, startX: 0, startY: 0);
+
+    test('a single mine never starts a chain', () {
+      final engine = chainEngine();
+      flagAndSelect(engine, _mines([(2, 2)]));
+      final result = engine.commitSalvage();
+      expect(engine.chainLevel, 0);
+      expect(result.chainLevel, 0);
+      expect(result.chainBonus, 0);
+    });
+
+    test('consecutive non-shrinking batches build the chain, level by level', () {
+      final engine = chainEngine();
+
+      flagAndSelect(engine, _mines([(2, 2), (5, 2)])); // size 2
+      var result = engine.commitSalvage();
+      expect(engine.chainLevel, 1);
+      expect(result.chainBonus, 0, reason: 'level 1 is not a chain yet');
+
+      flagAndSelect(engine, _mines([(1, 4), (4, 4)])); // size 2, same size
+      result = engine.commitSalvage();
+      expect(engine.chainLevel, 2);
+      expect(result.chainBonus, GameRules.chainBonus(2, 2));
+
+      flagAndSelect(engine, _mines([(7, 4), (0, 6), (3, 6)])); // size 3, grows
+      result = engine.commitSalvage();
+      expect(engine.chainLevel, 3);
+      expect(result.chainBonus, GameRules.chainBonus(3, 3));
+
+      expect(engine.bestChainLevel, 3);
+      expect(engine.lastBatchSize, 3);
+    });
+
+    test('a smaller batch breaks the chain but can restart it at level 1', () {
+      final engine = chainEngine();
+      flagAndSelect(engine, _mines([(2, 2), (5, 2)])); // size 2 -> level 1
+      engine.commitSalvage();
+      flagAndSelect(engine, _mines([(1, 4), (4, 4)])); // size 2 -> level 2
+      engine.commitSalvage();
+      expect(engine.chainLevel, 2);
+
+      // Smaller than the last batch (2), but still >= minChainBatch: restarts
+      // at 1 rather than dropping straight to 0.
+      flagAndSelect(engine, _mines([(7, 4)])); // size 1
+      // A lone mine is below minChainBatch, so this actually drops to 0 —
+      // exercise that first, then rebuild to confirm the "restart at 1" case
+      // on a genuinely smaller-but-qualifying batch.
+      var result = engine.commitSalvage();
+      expect(engine.chainLevel, 0);
+      expect(result.chainLevel, 0);
+
+      flagAndSelect(engine, _mines([(0, 6), (3, 6), (6, 6)])); // size 3
+      engine.commitSalvage();
+      expect(engine.chainLevel, 1);
+
+      flagAndSelect(engine, _mines([(2, 8), (7, 8)])); // size 2, smaller than 3
+      result = engine.commitSalvage();
+      expect(
+        engine.chainLevel,
+        1,
+        reason: 'smaller but still >= minChainBatch restarts at 1, not 0',
+      );
+      expect(result.chainLevel, 1);
+    });
+
+    group('chainAtRisk and pendingChainBonus', () {
+      test('are both quiet with no active chain', () {
+        final engine = chainEngine();
+        engine.toggleFlag(at(2, 2));
+        engine.toggleSalvageSelection(at(2, 2));
+        expect(engine.chainAtRisk, isFalse);
+        expect(engine.pendingChainBonus, 0);
+      });
+
+      test('warn only when the pending selection would shrink the chain', () {
+        final engine = chainEngine();
+        flagAndSelect(engine, _mines([(2, 2), (5, 2)])); // size 2 -> level 1
+        engine.commitSalvage();
+        flagAndSelect(engine, _mines([(1, 4), (4, 4)])); // size 2 -> level 2
+        engine.commitSalvage();
+        expect(engine.chainLevel, 2);
+
+        // Selecting a same-size batch: safe, and previews the next bonus.
+        engine.toggleFlag(at(7, 4));
+        engine.toggleSalvageSelection(at(7, 4));
+        engine.toggleFlag(at(0, 6));
+        engine.toggleSalvageSelection(at(0, 6));
+        expect(engine.chainAtRisk, isFalse);
+        expect(engine.pendingChainLevel, 3);
+        expect(engine.pendingChainBonus, GameRules.chainBonus(3, 2));
+
+        // Dropping to a single selected mine puts the chain at risk.
+        engine.toggleSalvageSelection(at(0, 6));
+        expect(engine.selectionSize, 1);
+        expect(engine.chainAtRisk, isTrue);
+      });
+    });
+
+    test('toJson/fromJson round-trips chainLevel, lastBatchSize and bestChainLevel', () {
+      final engine = chainEngine();
+      flagAndSelect(engine, _mines([(2, 2), (5, 2)]));
+      engine.commitSalvage();
+      flagAndSelect(engine, _mines([(1, 4), (4, 4)]));
+      engine.commitSalvage();
+
+      final restored = MinesweeperEngine.fromJson(engine.toJson())!;
+      expect(restored.chainLevel, engine.chainLevel);
+      expect(restored.lastBatchSize, engine.lastBatchSize);
+      expect(restored.bestChainLevel, engine.bestChainLevel);
+    });
+
+    test('a save from rules version 1 (pre-chain) is refused', () {
+      final engine = chainEngine();
+      final json = engine.toJson()..['rulesVersion'] = 1;
+      expect(MinesweeperEngine.fromJson(json), isNull);
     });
   });
 

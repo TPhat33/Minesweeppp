@@ -52,7 +52,12 @@ enum InputMode { reveal, flag }
 abstract final class GameRules {
   /// Bump whenever a scoring or gameplay rule changes; level codes carry it so
   /// that old codes never masquerade as comparable runs.
-  static const int rulesVersion = 1;
+  ///
+  /// 2: added the salvage chain bonus (see below). A code or a save written
+  /// under version 1 is refused rather than silently scored under different
+  /// rules — [LevelCode.isCurrentRules] and [MinesweeperEngine.fromJson]
+  /// handle that; nothing here needs a migration path.
+  static const int rulesVersion = 2;
 
   // ---------------------------------------------------------------- salvage
   static const int salvageBaseScore = 100;
@@ -75,6 +80,34 @@ abstract final class GameRules {
 
   /// Energy is one tenth of the salvage score, so batching pays off twice.
   static int salvageEnergy(int count) => salvageScore(count) ~/ 10;
+
+  /// A batch of at least this size can start or extend a chain. A single
+  /// mine is the "playing it safe" move by definition, so it never chains —
+  /// chains reward committing to a batch, not just salvaging at all.
+  static const int minChainBatch = 2;
+
+  /// Consecutive non-shrinking batches build a chain; a batch smaller than
+  /// the one before it (or a lone mine) breaks it. Capped the same way
+  /// [maxTimeBoosts] and [maxEnergyBonus] are: a ceiling that keeps a single
+  /// hot streak from deciding the whole run outright.
+  static const int maxChainLevel = 5;
+
+  /// Points added per mine in the batch, per chain level above 1.
+  ///
+  /// At chain level 2 a batch of 3 gets +75 on top of its 360 base — felt,
+  /// not a base-score-doubling swing. Provisional: nothing has measured a
+  /// full run's totals against this yet. If a played-well run on Expert
+  /// scores far past double a typical one, lower this before lowering
+  /// [maxChainLevel] — the level is what keeps the target legible; the slope
+  /// is what tuning should touch.
+  static const int chainBonusPerStep = 25;
+
+  /// Bonus for cashing in [count] mines while the chain is at [chainLevel].
+  /// Zero below level 2 — a chain of one is just an ordinary batch.
+  static int chainBonus(int chainLevel, int count) {
+    if (chainLevel <= 1) return 0;
+    return chainBonusPerStep * (chainLevel - 1) * count;
+  }
 
   // ----------------------------------------------------------------- energy
   /// Energy spent for one time extension.

@@ -35,6 +35,18 @@ class HudBar extends StatelessWidget {
           color: urgent ? Palette.danger : Palette.textPrimary,
           emphasis: urgent,
         ),
+        // Only appears once a chain is actually running (level 1 is just an
+        // ordinary batch) — grouped with mines/timer, not the score, so the
+        // score chip on the far right never shifts as the chain grows.
+        if (engine.chainLevel >= 2) ...[
+          const SizedBox(width: 8),
+          StatChip(
+            icon: Icons.link_rounded,
+            value: 'x${engine.chainLevel}',
+            color: Palette.energy,
+            emphasis: true,
+          ),
+        ],
         const Spacer(),
         StatChip(
           icon: Icons.auto_awesome_rounded,

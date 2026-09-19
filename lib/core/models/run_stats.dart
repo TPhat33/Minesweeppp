@@ -11,6 +11,7 @@ class RunStats {
     this.bestTimeSeconds,
     this.largestBatch = 0,
     this.minesSalvaged = 0,
+    this.bestChain = 0,
   });
 
   final int played;
@@ -23,6 +24,10 @@ class RunStats {
   final int largestBatch;
   final int minesSalvaged;
 
+  /// The highest salvage chain level ever reached at this difficulty and
+  /// mode. See [MinesweeperEngine.bestChainLevel].
+  final int bestChain;
+
   double get winRate => played == 0 ? 0 : won / played;
 
   RunStats recordRun({
@@ -31,6 +36,7 @@ class RunStats {
     required int elapsedSeconds,
     required int largestBatch,
     required int minesSalvaged,
+    required int bestChain,
   }) {
     return RunStats(
       played: played + 1,
@@ -43,6 +49,7 @@ class RunStats {
           : bestTimeSeconds,
       largestBatch: math.max(this.largestBatch, largestBatch),
       minesSalvaged: this.minesSalvaged + minesSalvaged,
+      bestChain: math.max(this.bestChain, bestChain),
     );
   }
 
@@ -53,6 +60,7 @@ class RunStats {
     'bestTimeSeconds': bestTimeSeconds,
     'largestBatch': largestBatch,
     'minesSalvaged': minesSalvaged,
+    'bestChain': bestChain,
   };
 
   static RunStats fromJson(Map<String, dynamic> json) => RunStats(
@@ -62,6 +70,7 @@ class RunStats {
     bestTimeSeconds: json['bestTimeSeconds'] as int?,
     largestBatch: json['largestBatch'] as int? ?? 0,
     minesSalvaged: json['minesSalvaged'] as int? ?? 0,
+    bestChain: json['bestChain'] as int? ?? 0,
   );
 
   static String keyFor(Difficulty difficulty, GameMode mode) =>

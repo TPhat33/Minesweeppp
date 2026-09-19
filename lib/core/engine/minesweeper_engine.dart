@@ -73,6 +73,9 @@ class MinesweeperEngine {
   int _salvagedCount = 0;
   int _largestBatch = 0;
   int _salvageBatches = 0;
+  int _chainLevel = 0;
+  int _lastBatchSize = 0;
+  int _bestChainLevel = 0;
   double _elapsedSeconds = 0;
   double _secondsRemaining;
 
@@ -88,6 +91,60 @@ class MinesweeperEngine {
   int get salvagedCount => _salvagedCount;
   int get largestBatch => _largestBatch;
   int get salvageBatches => _salvageBatches;
+
+  /// Consecutive non-shrinking batches cashed in so far. 0 or 1 both mean "no
+  /// chain yet" — a chain becomes visible once a second qualifying batch
+  /// extends it. See [GameRules.chainBonus].
+  int get chainLevel => _chainLevel;
+
+  /// The highest [chainLevel] this run has reached, for [RunStats].
+  int get bestChainLevel => _bestChainLevel;
+
+  /// The size of the last salvaged batch, or 0 before the first one. Exposed
+  /// so the UI can explain *why* a given selection would extend or break the
+  /// chain, not just that it would.
+  int get lastBatchSize => _lastBatchSize;
+
+  /// What [chainLevel] would become if the current selection were committed
+  /// right now, without changing any state. Equal to [chainLevel] itself
+  /// when the selection is empty.
+  int get pendingChainLevel {
+    final count = _selection.length;
+    if (count == 0) return _chainLevel;
+    return _nextChainLevel(count);
+  }
+
+  /// The chain bonus the current selection would earn if committed right now.
+  /// 0 when the selection is empty or would not extend a chain.
+  int get pendingChainBonus {
+    final count = _selection.length;
+    if (count == 0) return 0;
+    return GameRules.chainBonus(pendingChainLevel, count);
+  }
+
+  /// True when committing the current selection would break an active chain
+  /// — the selection is non-empty, a chain of at least 2 is running, and this
+  /// batch is too small to extend it. The UI uses this to warn before the
+  /// player throws away a streak they may not have been tracking.
+  bool get chainAtRisk {
+    final count = _selection.length;
+    if (count == 0 || _chainLevel < 2) return false;
+    return count < GameRules.minChainBatch || count < _lastBatchSize;
+  }
+
+  /// Chain level after cashing in a batch of [count], per the same rule
+  /// [commitSalvage] applies: a non-shrinking, big-enough batch extends the
+  /// chain (capped); a smaller batch restarts it at 1 if it still qualifies
+  /// on its own, or drops it to 0.
+  int _nextChainLevel(int count) {
+    final extendsChain =
+        count >= GameRules.minChainBatch && count >= _lastBatchSize;
+    if (extendsChain) {
+      return math.min(_chainLevel + 1, GameRules.maxChainLevel);
+    }
+    return count >= GameRules.minChainBatch ? 1 : 0;
+  }
+
   double get elapsedSeconds => _elapsedSeconds;
   double get secondsRemaining => _secondsRemaining;
   bool get isOver => _status != GameStatus.playing;
@@ -217,7 +274,12 @@ class MinesweeperEngine {
     }
 
     final count = picks.length;
-    final gained = GameRules.salvageScore(count);
+    _chainLevel = _nextChainLevel(count);
+    _lastBatchSize = count;
+    _bestChainLevel = math.max(_bestChainLevel, _chainLevel);
+    final chainGained = GameRules.chainBonus(_chainLevel, count);
+
+    final gained = GameRules.salvageScore(count) + chainGained;
     final energyGained = mode == GameMode.timed
         ? GameRules.salvageEnergy(count)
         : 0;
@@ -242,6 +304,8 @@ class MinesweeperEngine {
       energyDelta: energyGained,
       batchSize: count,
       batchBonus: GameRules.batchBonus(count),
+      chainLevel: _chainLevel,
+      chainBonus: chainGained,
     );
   }
 
@@ -424,6 +488,9 @@ class MinesweeperEngine {
     'salvagedCount': _salvagedCount,
     'largestBatch': _largestBatch,
     'salvageBatches': _salvageBatches,
+    'chainLevel': _chainLevel,
+    'lastBatchSize': _lastBatchSize,
+    'bestChainLevel': _bestChainLevel,
     'elapsedSeconds': _elapsedSeconds,
     'secondsRemaining': _secondsRemaining,
   };
@@ -472,6 +539,9 @@ class MinesweeperEngine {
     engine._salvagedCount = json['salvagedCount'] as int;
     engine._largestBatch = json['largestBatch'] as int;
     engine._salvageBatches = json['salvageBatches'] as int;
+    engine._chainLevel = json['chainLevel'] as int? ?? 0;
+    engine._lastBatchSize = json['lastBatchSize'] as int? ?? 0;
+    engine._bestChainLevel = json['bestChainLevel'] as int? ?? 0;
     engine._elapsedSeconds = (json['elapsedSeconds'] as num).toDouble();
     engine._secondsRemaining = (json['secondsRemaining'] as num).toDouble();
     return engine;

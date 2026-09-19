@@ -115,7 +115,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   Future<void> _confirmSalvage() async {
     final engine = _session.engine;
     if (engine.selectionSize == 0) return;
-    if (!_session.settings.confirmSalvage || engine.selectionSize == 1) {
+    // The size/setting skip exists for the "wrong mine ends the run" risk —
+    // it says nothing about a chain, which a single stray salvage can break
+    // just as easily as a bad guess can end the run. Never skip silently
+    // past that specific cost.
+    if ((!_session.settings.confirmSalvage || engine.selectionSize == 1) &&
+        !engine.chainAtRisk) {
       _session.commitSalvage();
       return;
     }
@@ -126,7 +131,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         title: const Text('Salvage the batch?'),
         content: Text(
           '${engine.selectionSize} marked for +${engine.pendingSalvageScore}.\n'
-          'If even one of them is not a mine, the run ends.',
+          'If even one of them is not a mine, the run ends.'
+          '${engine.chainAtRisk ? '\n\nThis breaks your x${engine.chainLevel} chain.' : ''}',
         ),
         actions: [
           TextButton(
@@ -219,6 +225,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                         selectionSize: engine.selectionSize,
                         pendingScore: engine.pendingSalvageScore,
                         pendingBonus: engine.pendingBatchBonus,
+                        pendingChainLevel: engine.pendingChainLevel,
+                        pendingChainBonus: engine.pendingChainBonus,
+                        chainAtRisk: engine.chainAtRisk,
                         flagCount: engine.flagCount,
                         onSalvage: _confirmSalvage,
                         onClear: _session.clearSelection,

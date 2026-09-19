@@ -16,6 +16,9 @@ class SalvageBar extends StatelessWidget {
     required this.selectionSize,
     required this.pendingScore,
     required this.pendingBonus,
+    required this.pendingChainLevel,
+    required this.pendingChainBonus,
+    required this.chainAtRisk,
     required this.flagCount,
     required this.onSalvage,
     required this.onClear,
@@ -27,6 +30,19 @@ class SalvageBar extends StatelessWidget {
   final int selectionSize;
   final int pendingScore;
   final int pendingBonus;
+
+  /// The chain level committing the current selection would reach.
+  final int pendingChainLevel;
+
+  /// What committing the current selection would add on top of [pendingBonus]
+  /// for extending the salvage chain. 0 when there is no active chain or the
+  /// batch is too small to extend it.
+  final int pendingChainBonus;
+
+  /// True when committing the current selection would break an active chain
+  /// instead of extending it.
+  final bool chainAtRisk;
+
   final int flagCount;
   final VoidCallback onSalvage;
   final VoidCallback onClear;
@@ -48,6 +64,9 @@ class SalvageBar extends StatelessWidget {
                   selectionSize: selectionSize,
                   pendingScore: pendingScore,
                   pendingBonus: pendingBonus,
+                  pendingChainLevel: pendingChainLevel,
+                  pendingChainBonus: pendingChainBonus,
+                  chainAtRisk: chainAtRisk,
                   onSalvage: onSalvage,
                   onClear: onClear,
                 ),
@@ -85,6 +104,9 @@ class _BatchPanel extends StatelessWidget {
     required this.selectionSize,
     required this.pendingScore,
     required this.pendingBonus,
+    required this.pendingChainLevel,
+    required this.pendingChainBonus,
+    required this.chainAtRisk,
     required this.onSalvage,
     required this.onClear,
   });
@@ -92,6 +114,9 @@ class _BatchPanel extends StatelessWidget {
   final int selectionSize;
   final int pendingScore;
   final int pendingBonus;
+  final int pendingChainLevel;
+  final int pendingChainBonus;
+  final bool chainAtRisk;
   final VoidCallback onSalvage;
   final VoidCallback onClear;
 
@@ -149,16 +174,28 @@ class _BatchPanel extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                // The nudge that makes waiting tempting.
+                // The nudge that makes waiting tempting — and, when a chain
+                // is on the line, the warning that waiting costs it. This is
+                // the one line the player is already reading while deciding
+                // whether to commit, so it is where both belong.
                 Text(
-                  pendingBonus > 0
-                      ? 'incl. +$pendingBonus batch · next +${GameRules.salvageBaseScore + nextBonus}'
-                      : 'next one is worth +${GameRules.salvageBaseScore + nextBonus}',
+                  chainAtRisk
+                      ? 'breaks your x$pendingChainLevel chain'
+                      : [
+                          pendingBonus > 0
+                              ? 'incl. +$pendingBonus batch'
+                              : null,
+                          pendingChainBonus > 0
+                              ? 'chain x$pendingChainLevel +$pendingChainBonus'
+                              : null,
+                          'next +${GameRules.salvageBaseScore + nextBonus}',
+                        ].nonNulls.join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Palette.energy,
+                  style: TextStyle(
+                    color: chainAtRisk ? Palette.danger : Palette.energy,
                     fontSize: 11,
+                    fontWeight: chainAtRisk ? FontWeight.w700 : null,
                   ),
                 ),
               ],

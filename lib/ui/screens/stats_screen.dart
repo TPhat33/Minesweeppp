@@ -157,6 +157,13 @@ class _ModeRow extends StatelessWidget {
                   label: 'best batch',
                   color: Palette.energy,
                 ),
+              if (stats.bestChain > 1)
+                StatChip(
+                  icon: Icons.link_rounded,
+                  value: 'x${stats.bestChain}',
+                  label: 'best chain',
+                  color: Palette.energy,
+                ),
               if (stats.minesSalvaged > 0)
                 StatChip(
                   icon: Icons.bolt_rounded,

@@ -62,6 +62,7 @@ class PlayerStore {
       elapsedSeconds: engine.elapsedSeconds.round(),
       largestBatch: engine.largestBatch,
       minesSalvaged: engine.salvagedCount,
+      bestChain: engine.bestChainLevel,
     );
     await _prefs.setString(
       _statsKey,

@@ -29,6 +29,8 @@ class MoveResult {
     this.energyDelta = 0,
     this.batchSize = 0,
     this.batchBonus = 0,
+    this.chainLevel = 0,
+    this.chainBonus = 0,
   });
 
   const MoveResult.none(this.status)
@@ -44,7 +46,9 @@ class MoveResult {
       scoreDelta = 0,
       energyDelta = 0,
       batchSize = 0,
-      batchBonus = 0;
+      batchBonus = 0,
+      chainLevel = 0,
+      chainBonus = 0;
 
   final MoveKind kind;
   final GameStatus status;
@@ -72,6 +76,14 @@ class MoveResult {
   final int energyDelta;
   final int batchSize;
   final int batchBonus;
+
+  /// The salvage chain level *after* this move, so the renderer can react
+  /// without re-reading engine state. 0 outside of a salvage move.
+  final int chainLevel;
+
+  /// The chain bonus this particular batch earned, already folded into
+  /// [scoreDelta].
+  final int chainBonus;
 
   bool get changed => kind != MoveKind.none;
   bool get isFatal =>
