@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:minesweeppp/core/engine/game_rules.dart';
 import 'package:minesweeppp/core/storage/player_store.dart';
+import 'package:minesweeppp/ui/screens/game_screen.dart';
 import 'package:minesweeppp/ui/screens/home_screen.dart';
 import 'package:minesweeppp/ui/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,4 +77,62 @@ void main() {
     await _pumpHome(tester, await _store());
     expect(find.text('Run in progress'), findsNothing);
   });
+
+  // GameScreen hosts a live Flame game loop, which schedules a frame every
+  // tick and so never goes idle — pumpAndSettle() would spin forever once
+  // we've navigated into it. A bounded pump stands in for it instead.
+  Future<void> settleFrames(WidgetTester tester, {int frames = 12}) async {
+    for (var i = 0; i < frames; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+  }
+
+  // Board generation goes through compute(), which on the VM spawns a real
+  // isolate — genuine cross-isolate communication, not something the fake
+  // clock behind tester.pump() advances. tester.runAsync() steps outside
+  // that fake clock so the real await actually resolves, matching the
+  // pattern Flutter's own docs use for testing other real-async APIs.
+  Future<void> waitForRealAsyncWork(WidgetTester tester) async {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+  }
+
+  testWidgets('a tap on START RUN opens exactly one game screen', (
+    tester,
+  ) async {
+    await _pumpHome(tester, await _store());
+    await tester.tap(find.text('START RUN'));
+    await tester.pump();
+    await waitForRealAsyncWork(tester);
+    await settleFrames(tester);
+    expect(find.byType(GameScreen), findsOneWidget);
+  });
+
+  testWidgets(
+    'tapping START RUN twice before it navigates never opens two game '
+    'screens',
+    (tester) async {
+      // Regression test: the generating dialog used to fire-and-forget
+      // (`unawaited(showDialog(...))`) while separately awaiting board
+      // generation, which raced on web — generation could finish inside a
+      // single microtask, popping and re-pushing routes out of order. A
+      // second tap landing in that window used to be able to start a second
+      // run stacked on top of the first. Fixed by (a) the dialog owning its
+      // own generate-then-pop sequence as one Future, and (b) a `_busy` flag
+      // that makes the button a no-op while a run is already starting.
+      await _pumpHome(tester, await _store());
+
+      final startRun = find.text('START RUN');
+      await tester.tap(startRun);
+      // No pump in between: both taps land before the first has navigated,
+      // which is exactly the window the fix closes.
+      await tester.tap(startRun, warnIfMissed: false);
+      await tester.pump();
+      await waitForRealAsyncWork(tester);
+      await settleFrames(tester);
+
+      expect(find.byType(GameScreen), findsOneWidget);
+    },
+  );
 }

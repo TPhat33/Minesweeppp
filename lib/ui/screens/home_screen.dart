@@ -32,6 +32,14 @@ class _HomeScreenState extends State<HomeScreen> {
   late GameSettings _settings;
   MinesweeperEngine? _savedRun;
 
+  /// True from the moment a run starts generating until we are back at the
+  /// menu. Generation can resolve inside a single microtask on web (nothing
+  /// to wait on there — see `compute()` in game_factory.dart), which leaves a
+  /// window where a second tap on START RUN before the first has navigated
+  /// away would fire a second, overlapping generate-and-push. This flag is
+  /// what closes that window: every entry point below checks and sets it.
+  bool _busy = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,15 +59,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _play({int? seed}) async {
-    final engine = await _generate(difficulty: _difficulty, mode: _mode, seed: seed);
-    if (engine == null) return;
-    await _runGame(engine);
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final engine = await _generate(
+        difficulty: _difficulty,
+        mode: _mode,
+        seed: seed,
+      );
+      if (engine == null) return;
+      await _runGame(engine);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _resume() async {
+    if (_busy) return;
     final saved = _savedRun;
     if (saved == null) return;
-    await _runGame(saved);
+    setState(() => _busy = true);
+    try {
+      await _runGame(saved);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   /// Plays a run and honours whatever the results sheet asked for next, so a
@@ -91,31 +115,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Boards are proved guess-free before they are handed over, which takes a
   /// moment on the big presets — hence the progress dialog.
+  ///
+  /// The dialog does its own generating and pops itself with the result,
+  /// rather than this method firing `showDialog` and separately awaiting
+  /// `GameFactory.create` and then popping: that used to race, because
+  /// generation can finish inside a single microtask on web (nothing to wait
+  /// on there — see `compute()` in game_factory.dart) — faster than the
+  /// dialog's own push had necessarily finished settling. Letting one Future
+  /// own the whole open-work-close sequence removes the race outright.
   Future<MinesweeperEngine?> _generate({
     required Difficulty difficulty,
     required GameMode mode,
     int? seed,
-  }) async {
-    final navigator = Navigator.of(context);
-    unawaited(
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const _GeneratingDialog(),
-      ),
-    );
-    try {
-      return await GameFactory.create(
+  }) {
+    return showDialog<MinesweeperEngine>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _GeneratingDialog(
         difficulty: difficulty,
         mode: mode,
         seed: seed,
-      );
-    } finally {
-      if (navigator.canPop()) navigator.pop();
-    }
+      ),
+    );
   }
 
   Future<void> _enterLevelCode() async {
+    if (_busy) return;
     final controller = TextEditingController();
     final code = await showDialog<LevelCode>(
       context: context,
@@ -140,13 +165,18 @@ class _HomeScreenState extends State<HomeScreen> {
       _difficulty = code.difficulty;
       _mode = code.mode;
     });
-    final engine = await _generate(
-      difficulty: code.difficulty,
-      mode: code.mode,
-      seed: code.seed,
-    );
-    if (engine == null) return;
-    await _runGame(engine);
+    setState(() => _busy = true);
+    try {
+      final engine = await _generate(
+        difficulty: code.difficulty,
+        mode: code.mode,
+        seed: code.seed,
+      );
+      if (engine == null) return;
+      await _runGame(engine);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _openSettings() async {
@@ -216,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 22),
             FilledButton(
-              onPressed: () => _play(),
+              onPressed: _busy ? null : () => _play(),
               child: const Text('START RUN'),
             ),
             const SizedBox(height: 10),
@@ -260,8 +290,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _GeneratingDialog extends StatelessWidget {
-  const _GeneratingDialog();
+/// Owns its own generation: it starts building the board once it has
+/// actually appeared, then pops itself with the result (or null if the run
+/// is somehow torn down first). Keeping the whole open-work-close sequence
+/// on one Future is what makes `_generate` above race-free.
+class _GeneratingDialog extends StatefulWidget {
+  const _GeneratingDialog({
+    required this.difficulty,
+    required this.mode,
+    this.seed,
+  });
+
+  final Difficulty difficulty;
+  final GameMode mode;
+  final int? seed;
+
+  @override
+  State<_GeneratingDialog> createState() => _GeneratingDialogState();
+}
+
+class _GeneratingDialogState extends State<_GeneratingDialog> {
+  @override
+  void initState() {
+    super.initState();
+    // Start after this dialog's own first frame, not before: on web,
+    // generation can finish inside a single microtask (see `compute()` in
+    // game_factory.dart), and starting it any earlier risked the pop landing
+    // before the push had settled.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _generate());
+  }
+
+  Future<void> _generate() async {
+    final engine = await GameFactory.create(
+      difficulty: widget.difficulty,
+      mode: widget.mode,
+      seed: widget.seed,
+    );
+    if (mounted) Navigator.of(context).pop(engine);
+  }
 
   @override
   Widget build(BuildContext context) {
