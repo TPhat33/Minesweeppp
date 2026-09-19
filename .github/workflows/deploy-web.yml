@@ -30,9 +30,16 @@ jobs:
           channel: stable
 
       - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
       # Base-href matches this being served from a project Pages site
-      # (https://<user>.github.io/<repo>/), not the repo root.
-      - run: flutter build web --release --base-href /${{ github.event.repository.name }}/
+      # (https://<user>.github.io/<repo>/), not the repo root. CanvasKit is
+      # bundled rather than fetched from Google's CDN at runtime (the
+      # default): one less external dependency, and it works on networks
+      # that block gstatic.com.
+      - run: >
+          flutter build web --release --no-web-resources-cdn
+          --base-href /${{ github.event.repository.name }}/
 
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -144,6 +144,13 @@ class BoardGenerator {
 
   /// Same as [generate], off the UI thread, so a slow Legendary roll never
   /// costs a frame.
+  ///
+  /// Dart VM only — `dart:isolate` has no web implementation, so this throws
+  /// `UnsupportedError` when compiled for the browser. The Flutter app uses
+  /// [package:flutter/foundation.dart]'s `compute()` instead (see
+  /// `lib/game/game_factory.dart`), which knows how to fall back to running
+  /// inline on web. This method stays for plain-Dart callers — a CLI tool, a
+  /// script, a non-Flutter test — where a real isolate is available.
   static Future<GeneratedBoard> generateAsync({
     required Difficulty difficulty,
     required int seed,
