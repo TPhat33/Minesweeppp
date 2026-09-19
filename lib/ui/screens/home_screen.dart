@@ -504,7 +504,7 @@ class _LevelCodeDialog extends StatelessWidget {
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
             decoration: const InputDecoration(
-              hintText: 'XXXX-XXXX-XXX',
+              hintText: 'XXXX-XXXX-XXXX',
               border: OutlineInputBorder(),
             ),
             style: AppTheme.readout.copyWith(fontSize: 16),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/engine/game_rules.dart';
@@ -35,6 +37,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late final GameSession _session;
   late final MinesweeperGame _game;
   bool _resultShown = false;
+  bool _pauseMenuOpen = false;
 
   @override
   void initState() {
@@ -63,6 +66,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     // back lands exactly where the player left off.
     if (state != AppLifecycleState.resumed) {
       _session.setPaused(true);
+      return;
+    }
+    // Coming back never restarts the clock behind the player's back: the pause
+    // menu opens and they decide when the run continues.
+    if (_session.paused && !_pauseMenuOpen && !_session.isOver) {
+      unawaited(_openPauseMenu());
     }
   }
 
@@ -135,12 +144,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _openPauseMenu() async {
+    if (_pauseMenuOpen) return;
+    _pauseMenuOpen = true;
     _session.setPaused(true);
     final action = await showDialog<_PauseAction>(
       context: context,
       barrierDismissible: false,
       builder: (context) => _PauseDialog(engine: _session.engine),
     );
+    _pauseMenuOpen = false;
     if (!mounted) return;
     switch (action) {
       case _PauseAction.quit:

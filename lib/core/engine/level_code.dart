@@ -24,7 +24,7 @@ class LevelCode {
   // Crockford base32: no I, L, O or U, so codes survive being read aloud.
   static const String _alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-  /// Formatted as `XXXX-XXXX-XXX` for easier reading and typing.
+  /// Formatted as `XXXX-XXXX-XXXX` for easier reading and typing.
   String encode() {
     final bytes = <int>[
       rulesVersion & 0xFF,

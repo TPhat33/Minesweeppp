@@ -158,6 +158,43 @@ void main() {
     expect(find.text('this board may need a guess'), findsOneWidget);
   });
 
+  testWidgets('coming back from the background asks before resuming', (
+    tester,
+  ) async {
+    final engine = engineFrom(_field, startX: 0, startY: 0, mode: GameMode.timed);
+    await _pumpGame(tester, engine, await _store());
+
+    for (final state in [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+      await tester.pump();
+    }
+    final remaining = engine.secondsRemaining;
+    await tester.pump(const Duration(seconds: 2));
+    expect(
+      engine.secondsRemaining,
+      remaining,
+      reason: 'the clock must not run while the app is in the background',
+    );
+
+    for (final state in [
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+      await tester.pump();
+    }
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    expect(find.text('Paused'), findsOneWidget);
+  });
+
   group('camera', () {
     testWidgets('a tap in the centre of the screen hits the start cell', (
       tester,
