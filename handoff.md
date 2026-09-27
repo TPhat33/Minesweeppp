@@ -16,11 +16,12 @@
 | อะไร | ค่า |
 | --- | --- |
 | Repo | `TPhat33/minesweeppp` (GitHub) |
-| Branch สำหรับพัฒนาต่อ | `claude/minesweeper-flutter-flame-ne3n6l` (เป็น **default branch** ของ repo ด้วย) |
-| Branch `main` | สร้างใหม่วันนี้ ชี้ commit เดียวกับ branch ด้านบน (`d330c9f`) — เป็น **snapshot ตอน merge** ยังไม่ sync อัตโนมัติกับ branch หลัก ถ้า commit ใหม่ในเอกสารนี้ถูก push เข้า `claude/minesweeper-flutter-flame-ne3n6l` แล้ว `main` จะล้าหลังหนึ่ง commit — ต้อง push ซ้ำเข้า `main` เองถ้าต้องการให้ตรงกัน |
-| Commit ล่าสุด | `d330c9f` — "feat: hide a fresh board behind a tap-to-start cover" |
+| Branch สำหรับพัฒนาต่อ | `main` — ใช้ branch นี้ตลอดตั้งแต่ 2026-09-27 เป็นต้นไป (เดิมใช้ `claude/minesweeper-flutter-flame-ne3n6l` แต่เลิกใช้แล้ว) |
+| `claude/minesweeper-flutter-flame-ne3n6l` | branch เก่าที่เคยเป็น default/dev branch — ยังอยู่บน GitHub เป็นประวัติ ไม่ต้องใช้งานต่อ อย่า push เข้า branch นี้อีก |
+| Default branch บน GitHub | **ต้องเปลี่ยนเป็น `main` ด้วยมือ** — GitHub MCP tools ที่มีในเซสชันนี้ไม่มีตัวไหนแก้ repo setting นี้ได้ (ไม่มี "update repository" / admin API) เจ้าของ repo ต้องเข้า Settings → Branches → Default branch → เปลี่ยนเป็น `main` เอง ที่ https://github.com/TPhat33/Minesweeppp/settings/branches |
+| Commit ล่าสุด | `3078a3b` — "docs: add handoff notes for the local agent picking up this work" (`main` และ `claude/minesweeper-flutter-flame-ne3n6l` ชี้ commit เดียวกันตอนนี้) |
 | Deploy จริง | https://tphat33.github.io/Minesweeppp/ ผ่าน GitHub Actions (`.github/workflows/deploy-web.yml`) |
-| **Deploy trigger สำคัญ** | Workflow ยิงเฉพาะตอน push เข้า `claude/minesweeper-flutter-flame-ne3n6l` เท่านั้น (`on.push.branches`) — **push เข้า `main` ไม่ทำให้เว็บ deploy ใหม่** ถ้าจะให้เว็บอัปเดต ต้อง push งานเข้า branch นั้นเสมอ |
+| **Deploy trigger** | แก้แล้วให้ยิงตอน push เข้า **`main`** (`on.push.branches: [main]`) — เดิมยิงจาก `claude/minesweeper-flutter-flame-ne3n6l` เท่านั้น เปลี่ยนพร้อมกับการย้ายมาใช้ `main` เป็นหลัก ถ้า push เข้า branch เก่าต่อไปจะไม่ deploy อะไรเลย |
 | Test suite | 154 tests, `flutter test` ผ่านหมด, `flutter analyze` สะอาด (เช็กล่าสุดวันนี้) |
 | Flutter version (pin ใน CI) | `3.47.5` stable (`subosito/flutter-action@v2`) |
 
@@ -151,7 +152,7 @@ http-server build/web -p 8080 --silent &
 
 ## 7. ถ้าจะ push งานใหม่
 
-Push เข้า `claude/minesweeper-flutter-flame-ne3n6l` เท่านั้นถ้าต้องการให้เว็บที่
-https://tphat33.github.io/Minesweeppp/ อัปเดตอัตโนมัติ (ดูข้อ 1) ถ้าต้องการให้ `main`
-sync ตามด้วย ต้อง push ซ้ำเข้า `main` เอง (เช่น `git push origin claude/minesweeper-flutter-flame-ne3n6l:main`
-หรือ merge ตามปกติ) — ไม่มี automation ทำเรื่องนี้ให้ตอนนี้
+Push เข้า `main` เท่านั้น — เป็น branch เดียวที่ใช้พัฒนาต่อและเป็น branch เดียวที่ทำให้เว็บ
+https://tphat33.github.io/Minesweeppp/ อัปเดตอัตโนมัติ (ดูข้อ 1) อย่า push เข้า
+`claude/minesweeper-flutter-flame-ne3n6l` อีก — branch นั้นถูกปลดจากหน้าที่ deploy แล้ว
+และงานใหม่ที่ push เข้าไปจะไม่ปรากฏบนเว็บจนกว่าจะ merge เข้า `main` เอง

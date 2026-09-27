@@ -6,7 +6,7 @@ name: Deploy web preview
 # workflow's approach, useless on an iPhone).
 on:
   push:
-    branches: [claude/minesweeper-flutter-flame-ne3n6l]
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
